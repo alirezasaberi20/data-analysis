@@ -4,7 +4,7 @@
 
 This dataset is designed to help us discover the best strategies for improving future marketing campaigns. By analyzing data from a previous marketing campaign conducted by a financial institution, we aim to identify patterns and insights that can guide the development of more effective marketing strategies to increase deposits.
 
-<img src='https://www.bankbound.com/wp-content/uploads/2022/11/8-Deposits-Strategies.jpg' width='400'>
+<img src='https://www.bankbound.com/wp-content/uploads/2022/11/8-Deposits-Strategies.jpg' width='600'>
 
 ### Source
 
