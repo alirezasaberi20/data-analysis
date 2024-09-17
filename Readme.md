@@ -20,4 +20,4 @@ To get started with the projects in this repository:
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/yourusername/data_analysis.git](https://github.com/alirezasaberi20/data-analysis.git
+   git clone https://github.com/alirezasaberi20/data-analysis.git
