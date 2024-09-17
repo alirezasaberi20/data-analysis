@@ -1,0 +1,810 @@
+---
+title: "project"
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+date: '2023-04-18'
+---
+```{r echo=FALSE, message=TRUE, warning=FALSE, include=TRUE}
+install.packages("glmnet")
+install.packages("Metrics")
+library(glmnet)
+library(Metrics)
+library(stringr)
+library(purrr)
+library(Amelia)
+library(GGally)
+library(caret)
+library(relaimpo)
+library(gbm)
+library(broom)
+library(knitr)
+library(ggplot2)
+library(tidyverse)
+```
+  
+
+1. Objectives of the study 
+
+  In this study, we will explore the dataset of Car Dekho. The dataset is about secondhand cars and various features of the Cars. Our goal is to identify the most important variables in determining the price of used cars, and to model data based on these variables in order to predict the selling price of used cars with different manufacturing date. We first start with analysis of the factors that influence price of used cars by exploring the dataset and all the components in order to discover correlations between data with a simple linear regression model and then we will use multiple and polynomial regressions as well as a lasso model to find a proper model to predict the price.
+
+2.Preparation of the Dataset 
+
+  The website of Car Dekho is https://www.cardekho.com/ and the dataset is also available on https://www.kaggle.com/datasets/nehalbirla/vehicle-dataset-from-cardekho in a public domain. This dataset consists of sale prices of 8128 cares sold between 1983 and 2020. It also has some features like km the car has been diven, name of the car, type of the fuel for cars. So, the dataset has 8128 rows and 13 columns.  
+
+In the code, as first steps we started importing some libraries and the dataset.  
+
+
+```{r}
+library(stringr)
+library(purrr)
+library(Amelia)
+library(GGally)
+library(caret)
+library(relaimpo)
+library(gbm)
+library(broom)
+library(knitr)
+library(ggplot2)
+library(tidyverse)
+library(glmnet)
+library(Metrics)
+```
+Importing dataset
+```{r}
+
+car <- read.csv('/Users/nahid/Documents/Cardetailsv3.csv')
+attach(car)
+```
+We made a first inspection on the dataset.  
+```{r}
+str(car)
+car$name <- word(car$name,1)
+```
+2.1. Variables description
+
+There is a description of variables of the dataset:  
+
+Name: Name of the cars
+
+Year: Year of the car when it was bought
+
+Selling_price: Price at which the car is being sold
+
+Km_driven: Number of Kilometers the car is driven
+
+Fuel: Fuel type of car (petrol / diesel / CNG / LPG / electric)
+
+Seller_type: Tells if a Seller is Individual or a Dealer or a TrustMark dealer. TrustMark is a certification and warranty programme launched by CarDekho.com and Gaadi.com to make your used car purchase safer
+
+Transmission: Gear transmission of the car (Automatic/Manual)
+
+Owner: Number of previous owners of the car. 
+
+Mileage: mileage of the car (kmpl) which is the number of miles that it can travel using one gallon or litre of fuel.
+
+Engine: engine capacity of the car (cc)
+
+Max_power: the amount of power that a car’s engine generates to move it (bhp)
+
+Torque: a physical quantity that indicates the traction in an engine design (Nm)
+
+Seats: The number of seats in a car 
+  
+2.2 Preprocessing 
+
+For the preprocessing part, we first analyzed the dimension of the dataset and checked for the presence of null values. There are no null values.  
+```{r}
+# dimension of the dataset
+dim(car)  
+```
+```{r}
+sum(is.na(car))
+```
+It is clear that our dataset has 221 not available value, which means we should take care of them in the preprocessing step.
+After that, we inspect the response variable price and make a log transformation.  
+check on the response variable
+```{r}
+summary(car$selling_price)
+```
+and now log transformation of :
+```{r}
+# logarithmic transformation of the response variable price
+car$log10_price = log10(selling_price)
+```
+EDA  
+In this step we plot the car name column to check the distribution of the cars and their brands
+```{r include=TRUE, echo=TRUE}
+
+ggplot(data = car, aes(x=name, fill = name)) +
+  geom_bar() + labs(x='Car Brand') + labs(title = "Bar Graph of Car Brand") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+According to the graph, highest numbers of cars fall into Maruti brand followed by Hyundai, Mahindra and Tata brands  
+
+2.3. Cleaning the Data  
+As we know the Computer works with 0,1 and in specefic does not understand name of the cars. Then, we should encode our Categorical variables. In other words, we substitute the name of the cars with numbers.
+
+```{r}
+car$name <- str_replace(car$name, 'Maruti', '0')
+car$name <- str_replace(car$name, 'Skoda', '1')
+car$name <- str_replace(car$name, 'Honda', '2')
+car$name <- str_replace(car$name, 'Hyundai', '3')
+car$name <- str_replace(car$name, 'Toyota', '4')
+car$name <- str_replace(car$name, 'Ford', '5')
+car$name <- str_replace(car$name, 'Renault', '6')
+car$name <- str_replace(car$name, 'Mahindra', '7')
+car$name <- str_replace(car$name, 'Tata', '8')
+car$name <- str_replace(car$name, 'Chevrolet', '9')
+car$name <- str_replace(car$name, 'Fiat', '10')
+car$name <- str_replace(car$name, 'Datsun', '11')
+car$name <- str_replace(car$name, 'Jeep', '12')
+car$name <- str_replace(car$name, 'Mercedes-Benz', '13')
+car$name <- str_replace(car$name, 'Mitsubishi', '14')
+car$name <- str_replace(car$name, 'Audi', '15')
+car$name <- str_replace(car$name, 'Volkswagen', '16')
+car$name <- str_replace(car$name, 'BMW', '17')
+car$name <- str_replace(car$name, 'Nissan', '18')
+car$name <- str_replace(car$name, 'Lexus', '19')
+car$name <- str_replace(car$name, 'Jaguar', '20')
+car$name <- str_replace(car$name, 'Land', '21')
+car$name <- str_replace(car$name, 'MG', '22')
+car$name <- str_replace(car$name, 'Volvo', '23')
+car$name <- str_replace(car$name, 'Daewoo', '24')
+car$name <- str_replace(car$name, 'Kia', '25')
+car$name <- str_replace(car$name, 'Force', '26')
+car$name <- str_replace(car$name, 'Ambassador', '27')
+car$name <- str_replace(car$name, 'Ashok', '28')
+car$name <- str_replace(car$name, 'Isuzu', '29')
+car$name <- str_replace(car$name, 'Opel', '30')
+car$name <- str_replace(car$name, 'Peugeot', '31')
+
+#Converting car name from categorical to numerical value
+
+car$name <- as.numeric(car$name)
+table(car$name)
+```
+
+
+We start with plotting the distribution of some main variables:
+```{r}
+ggplot(car, aes(x= selling_price)) +
+geom_histogram(fill="blue", color="grey", alpha=0.6) +
+labs(x ="selling Price (USD)", y="Count")
+```
+
+From the plot above we can observe that the selling price of majority of cars is less than two and half million dollars. Also it is clear that the distribution of the target variable price is right-skewd.
+```{r}
+ggplot(car, aes(x= log10_price)) +
+geom_histogram(fill="blue", color="grey", alpha=0.6) +
+labs(x ="Log(Price) (USD)", y="Count")
+```
+Since our response variable (price) is right-skewed, we decided to apply a logarithm transformation on it.
+As we can observe, the distribution of the logarithmic transformation of price becomes bell-shaped.  
+```{r}
+ggplot(car, aes(x= km_driven)) +
+geom_histogram(fill="#FF8080", color="grey",alpha=0.8) +
+labs(x ="km driven",y="Count")
+6
+```
+As it is shown in the graph, most of the cars have been driven less than 500000 kms, and it is obvious that the graph is right-skewd. Then we do the same procedure we did toward the price of the car, which is using logarithm. As we can observe, the distribution of the logarithmic transformation of km driven becomes bell-shaped.
+```{r}
+log10_km_driven <- log10(km_driven)
+ggplot(car, aes(x= log10_price)) +
+geom_histogram(fill="blue", color="grey", alpha=0.6) +
+labs(x ="log10(km_driven)", y="Count")
+```
+The next variable of our dataset is the year that car has been sold. First of all, we draw the graph of the year column. 
+```{r}
+ggplot(car, aes(year, fill='year'))+
+geom_bar() +
+labs(x = 'year', y = 'Count')
+```
+Our graph is left-skewed and also the year of most of the sold cars in our dataset
+is after 2010.
+
+```{r}
+car <- subset (car, select = -torque)
+
+```
+In our dataset, we have some values that their types are strings. As we know, we should give the computer numeric values. Then, we remove "kmpl" which stands for km per liter, and also "km/kg". Another thing that should be considered is we should take care of missing values. we replaced the missing values with the mean value of their regarding column.
+```{r}
+car$mileage <- str_replace(car$mileage, 'kmpl', '')
+car$mileage <- str_replace(car$mileage, 'km/kg', '')
+car$mileage <- as.numeric(car$mileage)
+car$mileage[is.na(car$mileage)]<-mean(car$mileage,na.rm=TRUE)
+```
+In the Column of engine, we had a value with type of string which was "cc". In order to have only numeric value, the string value should be removed. 
+We also replaced not avilable value in engine column with the mean value of engine column.
+```{r}
+car$engine <- str_replace(car$engine, 'CC', '')
+car$engine <- as.numeric(car$engine)
+car$engine[is.na(car$engine)]<-mean(car$engine,na.rm=TRUE)
+```
+Removing unit from max_power, converting it to numeric value and replacing the missing values with mean of max_power column
+```{r}
+car$max_power <- str_replace(car$max_power, 'bhp', '')
+car$max_power <- as.numeric(car$max_power)
+car$max_power[is.na(car$max_power)]<-mean(car$max_power,na.rm=TRUE)
+```
+Converting seats to numeric value and replacing the missing values with mean value
+The other thing that should be considered is that maybe in our dataset we have some null value but with not "NA" type, like null string. We should replace them with "NA" in order to use specific R function like is.na().
+```{r}
+car$seats <- as.numeric(car$seats)
+car$seats[is.na(car$seats)]<-median(car$seats,na.rm=TRUE)
+car$mileage[car$mileage == ""] <- NA
+car$engine[car$engine == ""] <- NA
+car$max_power[car$max_power == ""] <- NA
+```
+Checking for missing values  
+```{r}
+sapply(car, function(x) sum(is.na(x)))
+```
+Missing values map  
+```{r}
+missmap(car, legend = TRUE, col = c("yellow", "dodgerblue"))
+```
+Now We ensure that there are no missing values in the columns
+
+3. Exploring Data
+
+Bar graph of Fuel  
+```{r}
+ggplot(data = car, aes(x= fuel, fill = fuel)) +
+  geom_bar() + labs(x='Fuel') + labs(title = "Bar Graph of Fuel")
+```
+Diesel and Petrol have the highest ownership for the fuel types  
+Most of the cars fall into Diesel category followed by Petrol. Very few cars fall into CNG and LPG category.  
+Bar graph of Owner  
+```{r}
+ggplot(data = car, aes(x=owner, fill = owner)) +
+  geom_bar() + labs(x='Owner') + labs(title = "Bar Graph of Owner") 
+```
+Most of the cars are owned by first owners.  
+Bar graph of seats  
+```{r}
+ggplot(data = car, aes(x=seats, fill =seats)) +
+  geom_bar() + labs(x='Seats') + labs(title = "Bar Graph of Seats") 
+```
+Majority of the seats in the cars are 5. So compact cars are the most dominant one in the car market.  
+Converting transmission column into binary 0 if Manual and 1 if Automatic  
+```{r}
+car$transmission <- str_replace(car$transmission, 'Manual', "0")
+car$transmission <- str_replace(car$transmission, 'Automatic', "1")
+car$transmission <- as.numeric(car$transmission)
+table(car$transmission)  
+```
+Converting owner into Ordinal Encoder  
+```{r}
+car$owner <- str_replace(car$owner, 'First Owner', "0")
+car$owner <- str_replace(car$owner, 'Second Owner', "1")
+car$owner <- str_replace(car$owner, 'Third Owner', "2")
+car$owner <- str_replace(car$owner, 'Fourth & Above Owner', "3")
+car$owner <- str_replace(car$owner, 'Test Drive Car', "4")
+car$owner <- as.numeric(car$owner)
+table(car$owner)
+```
+Converting seller_type into Ordinal Encoder  
+```{r}
+car$seller_type <- str_replace(car$seller_type, "Trustmark Dealer", "0")
+car$seller_type <- str_replace(car$seller_type, "Dealer", "1")
+car$seller_type <- str_replace(car$seller_type, "Individual", "2")
+car$seller_type <- as.numeric(car$seller_type)
+table(car$seller_type)
+```
+Converting fuel into Ordinal Encoder  
+```{r}
+car$fuel <- str_replace(car$fuel, 'Diesel', "0")
+car$fuel <- str_replace(car$fuel, 'Petrol', "1")
+car$fuel <- str_replace(car$fuel, 'CNG', "2")
+car$fuel <- str_replace(car$fuel, 'LPG', "3")
+car$fuel <- as.numeric(car$fuel)
+table(car$fuel)
+```
+Histogram of Selling Price  
+```{r}
+ggplot(car, aes(x=selling_price)) + 
+  geom_histogram(aes(y=..density..), colour="black", fill="white")+
+  geom_density(alpha=.2, fill="blue")+
+  labs(x='Selling Price ') + labs(title = "Histogram Graph of Selling Price") +
+  scale_x_continuous(trans='log10')
+```
+Histogram of Km Driven  
+```{r}
+ggplot(car, aes(x=km_driven)) + 
+  geom_histogram(color="black", fill="blue", bins = 200)+
+  labs(x='Km Driven ') + labs(title = "Histogram Graph of Km Driven") +
+  scale_x_continuous(trans='log10')
+```
+Box plot of year
+It can be seen from the box plot that the newer the cars, the more expensive they are which is reasonable. 
+```{r}
+ggplot(car, aes(x=year, y=log10_price, fill=factor(year)))+
+geom_boxplot(alpha=0.3)+
+theme(legend.position="none") 
+```
+Box plot of Km Driven
+It can be seen from the box plot that The more number of Kilometers the car is driven, the lower the price which is reasonable again. 
+```{r}
+ggplot(car, aes(x= log(km_driven), y=log10_price, fill=factor(km_driven)))+
+geom_boxplot(alpha=0.3)+
+theme(legend.position="none") 
+```
+Box plot of fuel
+The price of cars decrease as the type of fuel change from diesel to petrol, petrol to CNG and CNG to LPG, respectively.
+
+```{r}
+ggplot(car, aes(x= fuel, y=log10_price, fill=factor(fuel)))+
+geom_boxplot(alpha=0.3)+
+theme(legend.position="none") 
+```
+Box plot of seller type
+TrustMark dealer and dealer type seem to have equal average selling price, but selling price of a car with warranty programm is more cetralized with less variance. price of cars selling by individual are the lowest. 
+```{r}
+ggplot(car, aes(x= seller_type, y=log10_price, fill=factor(seller_type)))+
+geom_boxplot(alpha=0.3)+
+theme(legend.position="none") 
+```
+Box plot of transmission
+It seems clear that price of an automatic car is higher than manual.
+
+```{r}
+ggplot(car, aes(x= transmission, y=log10_price, fill=factor(transmission)))+
+geom_boxplot(alpha=0.3)+
+theme(legend.position="none") 
+```
+Box plot of owner
+As the owner increases, the price decreases. The price of car increases a lot when the car is a test drive car.
+
+```{r}
+ggplot(car, aes(x= owner, y=log10_price, fill=factor(owner)))+
+geom_boxplot(alpha=0.3)+
+theme(legend.position="none") 
+```
+Box plot of mileage
+
+```{r}
+ggplot(car, aes(x= mileage, y=log10_price, fill=factor(mileage)))+
+geom_boxplot(alpha=0.3)+
+theme(legend.position="none")
+```
+Box plot of engine
+AS the engine capacity of the car increases, the price increases as well.
+
+```{r}
+ggplot(car, aes(x= engine, y=log10_price, fill=factor(engine)))+
+geom_boxplot(alpha=0.3)+
+theme(legend.position="none")
+```
+Box plot of mas power
+AS the amount of power that a car’s engine generates to move it increases, the price increases as well.
+
+```{r}
+ggplot(car, aes(x= max_power, y=log10_price, fill=factor(max_power)))+
+geom_boxplot(alpha=0.3)+
+theme(legend.position="none")
+```
+Box plot of seats
+The box plot shows that cars with less than 4 seats have the lowest price. Also 5 seats or more than that does not change the price that much.
+```{r}
+ggplot(car, aes(x= seats, y=log10_price, fill=factor(seats)))+
+geom_boxplot(alpha=0.3)+
+theme(legend.position="none")
+```
+
+Now we plot correlation plot of features
+```{r}
+library(corrplot)
+corrplot(cor(car), type="full", 
+         method ="color", title = "Correlation Plot", 
+         mar=c(0,0,1,0), tl.cex= 0.8, outline= T, tl.col="indianred4")
+```
+and also
+```{r}
+ggcorr(car, label = T)
+round(cor(car),2)
+```
+We can see that selling price is highly correlated to max_power then transmission and name.  
+
+4.Model Data 
+
+After analyzing the behaviors of the dataset, we try to find the model that fits well.
+  
+4.1. Accuracy metrics
+
+R-squared (R2): which is the proportion of variation in the outcome that is explained by the predictor variables. In multiple regression models, R2 corresponds to the squared correlation between the observed outcome values and the predicted values by the model. The Higher the R-squared, the better the model.
+
+Root Mean Squared Error (RMSE): which measures the average error performed by the model in predicting the outcome for an observation. Mathematically, the RMSE is the square root of the mean squared error (MSE), which is the average squared difference between the observed actual outome values and the values predicted by the model. So, MSE = mean((observeds - predicteds)^2) and RMSE = sqrt(MSE). The lower the RMSE, the better the model.
+
+Residual Standard Error (RSE): also known as the model sigma, is a variant of the RMSE adjusted for the number of predictors in the model. The lower the RSE, the better the model. In practice, the difference between RMSE and RSE is very small, particularly for large multivariate data.
+
+Akaike Information Criterion (AIC) : is a measure used to compare and select between competing statistical models. It provides a trade-off between the goodness of fit of the model and the complexity of the model. The AIC is based on the principle that a good model should fit the data well while minimizing the number of parameters used.
+
+   
+4.2. Splitting of train data and test data
+
+Below we will partition the dataset into Train (70%) and Test (30%) set and we will train different ML algorithms to Training sets and apply to the testing set.  
+```{r}
+set.seed(5)
+trainIndex <- createDataPartition(car$selling_price, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+train <- car[ trainIndex,]
+test <- car[-trainIndex,]
+```
+4.3. Linear Regression 1
+
+For start, we build the simplest model using all the available features.
+  
+```{r}
+m1_lr <- lm(selling_price ~ name+year+km_driven+seller_type+mileage+transmission+max_power+engine+fuel+owner+seats, data = train)
+summary(m1_lr)
+
+m1_lr_pred <- predict(m1_lr, test)
+radj <- summary(m1_lr)$adj.r.squared
+rse <- sqrt(sum(residuals(m1_lr)^2) / m1_lr$df.residual )
+rmse <- RMSE(m1_lr_pred, test$selling_price)
+aic <- AIC(m1_lr)
+m1_lr_reg <- cbind("Adjusted R sq"=radj, "RSE"=rse, "RMSE"=rmse, "AIC"=aic)
+```
+Checking the p_values of each explanatory variables, it is seen that features such as fuel, owner, and seats are not significant so we can remove them to improve the accuracy of the model.Moreover, we have an F-statistic of 1182 and a p-value almost equal to 0.
+
+4.4. Linear Regression 2
+
+  Below we build the linear model without the features fuel, owner, and seats.
+  
+```{r}
+m2_lr <- lm(selling_price ~ name+year+km_driven+seller_type+mileage+transmission+max_power+engine, data = train)
+summary(m2_lr)
+
+m2_lr_pred <- predict(m2_lr, test)
+radj <- summary(m2_lr)$adj.r.squared
+rse <- sqrt(sum(residuals(m2_lr)^2) / m2_lr$df.residual )
+rmse <- RMSE(m2_lr_pred, test$selling_price)
+aic <- AIC(m2_lr)
+m2_lr_reg <- cbind("Adjusted R sq"=radj, "RSE"=rse, "RMSE"=rmse, "AIC"=aic)
+```
+As it can be seen, We have 8 features, all of which are significant on selling price because of their p_values. We interpret from the coefficients that a unit change in transmission feature gives a bigger change in selling price than a unit change in other features give, given all other features are fixed and this is because transmission has the biggest coefficient of all features. In this case, given that all other features are fixed, a manual type car would have less price than an automatic one by $442,300.
+
+4.6. Adequacy checking of Linear Regression
+
+  In this section, we check some assumptions of linear regression such as: 
+• Linearity of data using Residuals x Fitted plot
+• Normality of residuals using Normal QQ plot
+• Homogeneity of residuals variance, residuals with constant variance using scale location plot
+
+```{r}
+residual1 <- residuals(m2_lr)
+
+# Plot the histogram of residuals
+hist(residual1, breaks = "FD", col = "lightblue", border = "white", main = "Distribution of Residuals", xlab = "Residuals")
+```
+```{r}
+options(repr.plot.width=20, repr.plot.height=5)
+par(mfrow=c(1,3))
+plot(m2_lr, which=c(1,2,3))
+```
+The distribution of error terms looks normal seeing the histogram plot and skewed to the left.
+In the Residuals x Fitted plot, we have a non horizontal line which may indicate a non-linear relationship. 
+In the Normal QQ plot, it is seen that the residuals are not exactly on the straight line, indicating that
+they are not normally distributed.The distribution with a fat tail will have both the ends of the Q-Q plot to deviate from the straight line and its center follows a straight line, whereas a thin-tailed distribution will form a Q-Q plot with a very less or negligible deviation at the ends thus making it a perfect fit for the Normal Distribution.
+In the Scale-Location plot, we have a non straight line which indicates heteroscedasticity.Heteroscedasticity can indicate that the model is not appropriate for the data or that there is some other underlying issue.
+
+4.7. Log Linear Regression
+
+  In order to correct the model inadequacies, we can try log-linear regression. Log-linear regression is a useful technique for modeling non-linear relationships between variables, particularly when the relationship can be transformed to be linear by taking the logarithm of one or more variables.
+
+```{r}
+train$log_selling_price <- log(train$selling_price)
+log_lr <- lm(log_selling_price ~ name+year+km_driven+seller_type+mileage+transmission+max_power+engine, data =train)
+summary(log_lr)
+log_lr_pred <- predict(log_lr, test)
+radj <- summary(log_lr)$adj.r.squared
+rse <- sqrt(sum(residuals(log_lr)^2) / log_lr$df.residual )
+rmse <- RMSE(log_lr_pred, log(test$selling_price))
+aic <- AIC(log_lr)
+log_lr_reg <- cbind("Adjusted R sq"=radj, "RSE"=rse, "RMSE"=rmse, "AIC"=aic)
+```
+In this model,the adjusted R-squared has improved. We have an adjusted R-squared near 1 which indicates that the independent variables in the model are good predictors of the dependent variable. It can interprate that we have a good model fit or overfitting.
+
+4.8.Adequacy checking of Log Linear Regression
+
+  Now we check the adequacy of the log linear model using related plots.
+  
+```{r}
+residual2 <- residuals(log_lr)
+
+# Plot the histogram of residuals
+hist(residual2, breaks = "FD", col = "lightblue", border = "white", main = "Distribution of Residuals", xlab = "Residuals")
+```
+Again, the distribution of error terms looks normal seeing the histogram plot.
+ 
+```{r}
+par(mfrow=c(1,3))
+plot(log_lr, which=c(1,2,3))
+```
+The evaluation has improved.In an ideal and unbiased regression, the red lines in the Residuals x Fitted and Scale-Location plots should be parallel to x axis. So, these two results are more or less acceptable. In the Normal QQ plot for ideal regression the points should lie on the diagonal line, our result is not that bad to reject the model.
+
+4.9. Polynomial regression
+
+   In this section, we want to use polynomial regression in order to improve our model because we observed that residual plots exhibit parabolic trend, which provides an indication of non-linearity in the data.
+We tried to generate a new feature matrix consisting of all polynomial combinations of the features with degree 2. We don’t want selling price to be included in the process of generating the polynomial combinations, so we take out selling price from train and test and save them as y_train and y_test, respectively.
+```{r}
+y_train <- train$selling_price
+y_test <- test$selling_price
+```
+From EDA, we know that feature seats has no correlation with selling price. Therefore, we can drop it.
+```{r}
+X_train <- train %>%
+select(-c(selling_price, seats, log_selling_price))
+X_test <- test %>%
+select(-c(selling_price, seats)) 
+```
+Now we use the formula below in order to apply polynomial combinations.
+```{r}
+formula <- as.formula(
+paste(' ~ .^2 + ', paste('poly(', colnames(X_train), ', 2, raw=TRUE)[, 2]', collapse = ' + '))
+)
+formula
+```
+In codes below, we insert y_train and y_test back to the new datasets.
+```{r}
+train_poly <- as.data.frame(model.matrix(formula, data = X_train))
+test_poly <- as.data.frame(model.matrix(formula, data = X_test))
+train_poly$selling_price <- y_train
+test_poly$selling_price <- y_test
+colnames(train_poly)
+```
+We can see that our new datasets train_poly and test_poly now have 133 columns.
+Then, in order to find the best model, we start with all features and use the backward elimination via the function step. The best model is the one with lowest AIC.
+
+```{r}
+temp <- lm(formula = selling_price ~ ., data = train_poly)
+step(temp)
+```
+We save the best model as l_p, and after that we predict and calculate the metrics.
+```{r}
+l_p <- lm(formula = selling_price ~ year + km_driven + fuel + seller_type + 
+    transmission + owner + mileage + engine + max_power + `poly(name, 2, raw = TRUE)[, 2]` + 
+    `poly(year, 2, raw = TRUE)[, 2]` + `poly(km_driven, 2, raw = TRUE)[, 2]` + 
+    `poly(max_power, 2, raw = TRUE)[, 2]` + `name:year` + `name:km_driven` + 
+    `name:fuel` + `name:seller_type` + `name:transmission` + 
+    `name:owner` + `name:engine` + `name:max_power` + `year:km_driven` + 
+    `year:fuel` + `year:seller_type` + `year:transmission` + 
+    `year:owner` + `year:mileage` + `year:engine` + `year:max_power` + 
+    `km_driven:transmission` + `km_driven:mileage` + `km_driven:max_power` + 
+    `fuel:seller_type` + `fuel:transmission` + `fuel:mileage` + 
+    `fuel:max_power` + `seller_type:transmission` + `seller_type:owner` + 
+    `seller_type:mileage` + `seller_type:max_power` + `transmission:owner` + 
+    `transmission:engine` + `transmission:max_power` + `owner:engine` + 
+    `owner:max_power`, data = train_poly)
+summary(l_p)
+l_p_pred <- predict(l_p, test_poly)
+radj <- summary(l_p)$adj.r.squared
+rse <- sqrt(sum(residuals(l_p)^2) / l_p$df.residual )
+rmse <- RMSE(l_p_pred, test$selling_price)
+aic <- AIC(l_p)
+l_p_reg <- cbind("Adjusted R sq"=radj, "RSE"=rse, "RMSE"=rmse, "AIC"=aic)
+```
+we have 42 features that are significant on selling price and 3 features that are not. these 3 features are mileage, km_driven * km_driven and year * mileage. 
+Intercept has the biggest coefficient of all features, which may indicate that the model is not properly centered around the data, and may be a sign of overfitting in this model. Additionally, it may suggest that the higher-order terms in the polynomial equation are not providing significant additional explanatory power to the model.
+```{r}
+residual3 <- residuals(l_p)
+
+# Plot the histogram of residuals
+hist(residual3, breaks = "FD", col = "lightblue", border = "white", main = "Distribution of Residuals", xlab = "Residuals")
+```
+
+```{r}
+options(repr.plot.width=21, repr.plot.height=6)
+par(mfrow=c(1,3))
+plot(l_p, which=c(1,2,3))
+```
+In the Residuals x Fitted plot, again we have a non horizontal line which indicates a non-linear relationship.
+IN the Normal QQ plot, we see that the residuals are not exactly on the straight line, Showing that
+they are not normally distributed.
+The non straight line in the Scale-Location plot indicates heteroscedasticity.
+
+4.10. Polynomial Regression 2
+
+   In this section, we decide to repeat the steps for polynomial regression in section 4.9. but this time we use the logarithm of selling price as target variable. We do this because of several reasons:
+• The relationship between our target variable and independent variables seems to be non-linear as it discussed in previous sections. Taking the logarithm of the target variable can often help to linearize this relationship, making it easier to model using polynomial independent variables.
+• In scale_location plot of our previous model, we observed heteroscedasticity. The logarithm of a variable often has the effect of stabilizing its variance, which can make it easier to model. This can be especially useful if the target variable exhibits heteroscedasticity, meaning that its variance is not constant across its range.
+• The logarithm of a variable can also help to mitigate the impact of outliers, which can have a disproportionately large effect on the predicted values if the target variable is modeled directly.
+
+```{r}
+y_train <- log(train$selling_price)
+y_test <- log(test$selling_price)
+```
+
+```{r}
+X_train <- train %>%
+  select(-c(selling_price, seats, log_selling_price))
+X_test <- test %>%
+  select(-c(selling_price, seats)) 
+```
+
+```{r}
+
+formula <- as.formula(
+  paste(' ~ .^2 + ', paste('poly(', colnames(X_train), ', 2, raw=TRUE)[, 2]', collapse = ' + '))
+)
+formula
+
+
+```
+
+```{r}
+train_poly <- as.data.frame(model.matrix(formula, data = X_train))
+test_poly <- as.data.frame(model.matrix(formula, data = X_test))
+train_poly$lg_selling_price <- y_train
+test_poly$lg_selling_price <- y_test
+colnames(train_poly)
+
+```
+Our datasets train_poly and test_poly have 133 columns.
+
+```{r}
+temp <- lm(formula = lg_selling_price ~ ., data = train_poly)
+step(temp)
+
+```
+Save the best model as l_p_log, then predict. After that, calculate the metrics.
+
+```{r}
+l_p_log <- lm(formula = lg_selling_price ~ name + year + km_driven + seller_type + transmission + 
+    owner + engine + max_power + `poly(name, 2, raw = TRUE)[, 2]` + 
+    `poly(year, 2, raw = TRUE)[, 2]` + `poly(km_driven, 2, raw = TRUE)[, 2]` + 
+    `poly(fuel, 2, raw = TRUE)[, 2]` + `poly(owner, 2, raw = TRUE)[, 2]` + 
+    `poly(mileage, 2, raw = TRUE)[, 2]` + `poly(engine, 2, raw = TRUE)[, 2]` + 
+    `poly(max_power, 2, raw = TRUE)[, 2]` + `name:year` + `name:km_driven` + 
+    `name:fuel` + `name:seller_type` + `name:transmission` + 
+    `name:engine` + `name:max_power` + `year:seller_type` + `year:transmission` + 
+    `year:owner` + `year:mileage` + `year:max_power` + `km_driven:seller_type` + 
+    `km_driven:owner` + `km_driven:mileage` + `km_driven:engine` + 
+    `km_driven:max_power` + `fuel:seller_type` + `fuel:mileage` + 
+    `fuel:engine` + `seller_type:owner` + `seller_type:mileage` + 
+    `seller_type:engine` + `seller_type:max_power` + `transmission:owner` + 
+    `transmission:mileage` + `transmission:max_power` + `mileage:engine` + 
+    `mileage:max_power` + `engine:max_power`, data = train_poly)
+summary(l_p_log)
+l_p_pred_log <- predict(l_p_log, test_poly)
+radj <- summary(l_p_log)$adj.r.squared
+rse <- sqrt(sum(residuals(l_p_log)^2) / l_p_log$df.residual )
+rmse <- RMSE(l_p_pred_log, log(test$selling_price))
+aic <- AIC(l_p_log)
+l_p_reg_log <- cbind("Adjusted R sq"=radj, "RSE"=rse, "RMSE"=rmse, "AIC"=aic)
+```
+We have 46 features, all of which are significant on logarithm of selling price, except for km_driven * max_power, seller_type * engine, seller_type * max_power and mileage * max_power. Intercept has the biggest coefficient of all features, that means a unit change in intercept gives a bigger change in selling price than a unit change in other features give, given all other features are fixed. In this case, considering all other features to be zero, selling price will be equal to  4039$.
+
+Now we plot our model to see the results.
+```{r}
+residual4 <- residuals(l_p_log)
+
+# Plot the histogram of residuals
+hist(residual4, breaks = "FD", col = "lightblue", border = "white", main = "Distribution of Residuals", xlab = "Residuals")
+```
+
+```{r}
+options(repr.plot.width=21, repr.plot.height=6)
+par(mfrow=c(1,3))
+plot(l_p_log, which=c(1,2,3))
+
+```
+The improved results can be seen in the plots. The red line in the Residuals x Fitted plot is almost parallel to x axis which shows a linear relationship. The red line in the Scale-Location plot is also more flat in compare to previous plots. This can be interpret that the variance of the residuals is more constant across all levels of the predictor variable.
+In the Normal QQ plot, more points are on the diagonal line which can indicate a normal distribution for residuals.
+
+4.11. Models Evaluation
+
+   Now we are going to compare the metrics between all the implemented models.
+```{r}
+result <- rbind(m1_lr_reg, m2_lr_reg,log_lr_reg, l_p_reg, l_p_reg_log)
+rownames(result) <- c("Linear Regression 1", "Linear Regression 2", "Log Linear Regression", "Polynomial Regression", "Polynomial Regression 2")
+result
+```
+Linear Regression 1 and Linear Regression 2:
+Adjusted R squared of these models are about 0.6954, which means that 69.54% of the variation in selling price can be explained by the independent variables we took in consideration. They might be good models, but we should also consider the other metrics used to compare their complexity with how well models fits the data.
+
+Log Linear Regression:
+This model has a very good Adjusted R squared and AIC values compared to our linear regression models
+
+Polynomial Regression:
+This model is the best in case of Adjusted R squared and better in case of RMSE which means model has a better fit and is better at making predictions. 
+
+Polynomial Regression 2:
+The metrics indicate that this can the best model. We used a log transform for this model so the scale of its RMSE is different. The model was very complex so maybe it is susceptible to over fitting. It has a very good Adjusted R squared value which is almost near 1 and the lowest AIC value
+which can be interpret as the best fitting model.
+
+Our second polynomial regression model seems to be one of our best model we obtained but since it is a complex model that has many features, in the next step, we are going to introduce a lasso model which its response variable and its features are the same as our second Polynomial Regression model. We used the cross validation to determine the optimal lambda.
+
+
+```{r}
+
+# Create the design matrix for the training set
+X <- model.matrix(lg_selling_price ~ name + year + km_driven + seller_type + transmission + 
+    owner + engine + max_power + `poly(name, 2, raw = TRUE)[, 2]` + 
+    `poly(year, 2, raw = TRUE)[, 2]` + `poly(km_driven, 2, raw = TRUE)[, 2]` + 
+    `poly(fuel, 2, raw = TRUE)[, 2]` + `poly(owner, 2, raw = TRUE)[, 2]` + 
+    `poly(mileage, 2, raw = TRUE)[, 2]` + `poly(engine, 2, raw = TRUE)[, 2]` + 
+    `poly(max_power, 2, raw = TRUE)[, 2]` + `name:year` + `name:km_driven` + 
+    `name:fuel` + `name:seller_type` + `name:transmission` + 
+    `name:engine` + `name:max_power` + `year:seller_type` + `year:transmission` + 
+    `year:owner` + `year:mileage` + `year:max_power` + `km_driven:seller_type` + 
+    `km_driven:owner` + `km_driven:mileage` + `km_driven:engine` + 
+    `km_driven:max_power` + `fuel:seller_type` + `fuel:mileage` + 
+    `fuel:engine` + `seller_type:owner` + `seller_type:mileage` + 
+    `seller_type:engine` + `seller_type:max_power` + `transmission:owner` + 
+    `transmission:mileage` + `transmission:max_power` + `mileage:engine` + 
+    `mileage:max_power` + `engine:max_power`, data = train_poly)
+
+# Remove the first column relative to the intercept
+X <- X[, -1]
+
+# Vector of responses for the training set
+y <- train_poly$lg_selling_price
+
+# Create the design matrix for the test set
+X_test <- model.matrix(lg_selling_price ~ name + year + km_driven + seller_type + transmission + 
+    owner + engine + max_power + `poly(name, 2, raw = TRUE)[, 2]` + 
+    `poly(year, 2, raw = TRUE)[, 2]` + `poly(km_driven, 2, raw = TRUE)[, 2]` + 
+    `poly(fuel, 2, raw = TRUE)[, 2]` + `poly(owner, 2, raw = TRUE)[, 2]` + 
+    `poly(mileage, 2, raw = TRUE)[, 2]` + `poly(engine, 2, raw = TRUE)[, 2]` + 
+    `poly(max_power, 2, raw = TRUE)[, 2]` + `name:year` + `name:km_driven` + 
+    `name:fuel` + `name:seller_type` + `name:transmission` + 
+    `name:engine` + `name:max_power` + `year:seller_type` + `year:transmission` + 
+    `year:owner` + `year:mileage` + `year:max_power` + `km_driven:seller_type` + 
+    `km_driven:owner` + `km_driven:mileage` + `km_driven:engine` + 
+    `km_driven:max_power` + `fuel:seller_type` + `fuel:mileage` + 
+    `fuel:engine` + `seller_type:owner` + `seller_type:mileage` + 
+    `seller_type:engine` + `seller_type:max_power` + `transmission:owner` + 
+    `transmission:mileage` + `transmission:max_power` + `mileage:engine` + 
+    `mileage:max_power` + `engine:max_power`, data = test_poly)
+
+# Remove the first column relative to the intercept
+X_test <- X_test[, -1]
+
+# Vector of responses for the test set
+y_test <- test_poly$lg_selling_price
+
+# Apply lasso to the training set
+lasso.mod <- glmnet(X, y, alpha = 1)
+
+# Determine the optimal lambda value using cross-validation
+cv.out.lasso <- cv.glmnet(X, y, alpha = 1)
+plot(cv.out.lasso)
+
+# Get the best lambda value
+bestlam <- cv.out.lasso$lambda.min
+
+# Compute the predictions on the test set
+lasso.pred <- predict(lasso.mod, s = bestlam, newx = X_test)
+
+lasso.rmse <- RMSE((lasso.pred), (y_test))
+lasso.rmse
+
+```
+
+The amount of RMSE for our lasso model is a bit higher than our second model (almost the same).
+It suggests that the Lasso model is not performing better than the second polynomial model in terms of predictive accuracy.
+Lasso regularization can shrink coefficients to zero, effectively performing feature selection and reducing model complexity. We want to see how much restrictive is our Lasso model in selecting features or controlling the coefficient values.
+Then, through the following code, we extract the coefficient estimates of the Lasso model based on the optimal lambda.The aim is to see how many variables does the lasso model considered to be zero.
+
+```{r}
+lasso.coef <- predict(lasso.mod,type="coefficients",s=bestlam)
+lasso.coef
+lasso.coef[lasso.coef!=0]
+```
+Our lasso model has considered the coefficient of only 4 variables out of our total 47 variable equal to zero. These variables are owner, name:year, year:seller_type and year:owner.
+
+
+5.Conclusion 
+
+In This section, we express the result obtained during analyzing and modeling data. The number of seats seems to have no or very low correlation with price, saying that it is not that it is not an important factor in deciding the price of the car. The rest of the factors had a relative correlation with the price which among them, Max Power (the amount of power that a car’s engine generates to move it) had the highest correlation value. There was not that much high positive or negative correlation among features themselves suggesting that features do not have strong impact on each other. 
+The impact of each feature on price seems to have a logical and reasonable trend.
+By fitting models to our data, we observed that the most important thing to have better results is applying a log transformation to our target variable price. Our log linear model without the features fuel, owner, and seats was a good model in case of Adjusted R2 and AIC and our polynomial regression model which considered the log of price had even a bit better results in case of these metrics too. Furthermore, since these models have a high Adjusted
+R2, we have an indicator of an accurate prediction for future values. Since the polynomial regression model was complex, we used a lasso model to consider a regularization. The result of lasso model has not changed that much and only a few coefficient were considered to be zero.
+
+
+
