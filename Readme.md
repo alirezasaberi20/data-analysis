@@ -1,5 +1,3 @@
-# Data Analysis Repository
-
 ## Overview
 
 Welcome to the Data Analysis repository! This repository is dedicated to exploring and analyzing various projects using classic machine learning algorithms. The primary focus is on both classification and regression tasks across different fields.
