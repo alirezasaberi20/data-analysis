@@ -28,3 +28,7 @@ This data set dates from 1988 and consists of four databases: Cleveland, Hungary
 - F1 Score: 0.970
 - Precision: 0.980
 - Recall: 0.961
+
+
+The dataset can be found [here](https://www.kaggle.com/datasets/johnsmith88/heart-disease-dataset/data) on Kaggle.
+
